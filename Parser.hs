@@ -43,14 +43,6 @@ data ParseResult a = ErrorResult ParseError
                    | Result Input a
                    deriving Eq
 
-instance Functor ParseResult where
-  fmap f (ErrorResult e) = ErrorResult e
-  fmap f (Result input a) = Result input (f a)
-
-instance (Show a) => Show (ParseResult a) where
-  show (ErrorResult e) = show e
-  show (Result i a) = concat [ "Result >", i, "< ", show a]
-
 isErrorResult :: ParseResult a -> Bool
 isErrorResult (ErrorResult _) = True
 isErrorResult (Result _ _)    = False
@@ -74,31 +66,6 @@ anyChar :: Parser Char
 anyChar = P $ \s -> case s of
                 [] -> ErrorResult UnexpectedEof
                 (c:cs) -> Result cs c
-
-instance Functor Parser where
-  fmap f p = P $ \input -> case parse p input of
-    ErrorResult e -> ErrorResult e
-    Result cs c   -> Result cs (f c)
-
-instance Applicative Parser where
-  pure x = P $ \input -> Result input x
-  p <*> q = P $ \input -> case parse p input of
-    ErrorResult e -> ErrorResult e
-    Result input' f -> case parse q input' of
-      ErrorResult e' -> ErrorResult e'
-      Result input'' a -> Result input'' (f a)
-
-instance Monad Parser where
-  return = pure
-  P p >>= f = P $ \s -> case p s of
-    ErrorResult e   -> ErrorResult e
-    Result s' a -> parse (f a) s'
-
-instance Alternative Parser where
-  empty = P $ \_ -> ErrorResult Failed
-  (P f) <|> (P g) = P $ \s -> case f s of
-    ErrorResult e -> g s
-    Result s' a   -> Result s' a
 
 many1 :: Parser a -> Parser [a]
 many1 = some
@@ -169,3 +136,38 @@ phoneNumber = number10_1 <|> number10_2 <|> number10_3 <|> localnumber
 
 -- ghci> parse phoneNumber "1234567890"
 -- Result >< "1234567890"
+
+--
+
+instance Functor ParseResult where
+  fmap f (ErrorResult e) = ErrorResult e
+  fmap f (Result input a) = Result input (f a)
+
+instance (Show a) => Show (ParseResult a) where
+  show (ErrorResult e) = show e
+  show (Result i a) = concat [ "Result >", i, "< ", show a]
+
+instance Functor Parser where
+  fmap f p = P $ \input -> case parse p input of
+    ErrorResult e -> ErrorResult e
+    Result cs c   -> Result cs (f c)
+
+instance Applicative Parser where
+  pure x = P $ \input -> Result input x
+  p <*> q = P $ \input -> case parse p input of
+    ErrorResult e -> ErrorResult e
+    Result input' f -> case parse q input' of
+      ErrorResult e' -> ErrorResult e'
+      Result input'' a -> Result input'' (f a)
+
+instance Monad Parser where
+  return = pure
+  P p >>= f = P $ \s -> case p s of
+    ErrorResult e   -> ErrorResult e
+    Result s' a -> parse (f a) s'
+
+instance Alternative Parser where
+  empty = P $ \_ -> ErrorResult Failed
+  (P f) <|> (P g) = P $ \s -> case f s of
+    ErrorResult e -> g s
+    Result s' a   -> Result s' a
